@@ -1,0 +1,397 @@
+#!/bin/bash
+
+# Controls Elgato Keylights.
+
+# Config file - needs to be readable AND writable by script
+CONFIG_FILE="$HOME/.config/elgato.control.json"
+
+#######################################
+# Find Elgato Lights and set them to the ELGATO_LIGHTS global
+# Globals:
+#   None
+# Arguments:
+#   None
+# Outputs:
+#   None
+#######################################
+function find_lights() {
+	echo "Finding Lights"
+
+	# Read from avahi-brows into $light
+	while read -r light
+	do
+		# Only look at lines that start with = && are IPv4
+		if [[ ${light:0:1} != '=' || $light != *"IPv4"* ]]; then
+			continue
+		fi
+
+		# Convert ; separated data in $light to array
+		IFS=';' read -r -a light <<< "${light}"
+
+		# IP is [7] and port is [8]
+		light="${light[7]}:${light[8]}"
+
+		# Check if light is already in $lights array
+		# The printf statement prints each element of the array, delimited by null characters.
+		# The grep statement uses the following flags to match an item that contains exactly the string given as myvalue (no more, no less):
+		#   -z/--null-data - Lines are terminated by a zero byte instead of a newline.
+		#   -F/--fixed-strings - Interpret PATTERNS as fixed strings, not regular expressions.
+		#   -x/--line-regexp - Select only those matches that exactly match the whole line.
+		#   -- - marks the end of command-line options, making Grep process "myvalue" as a non-option argument even if it starts with a dash
+		if ! printf '%s\0' "${lights[@]}" | grep -Fxqz -- "$light"; then
+			# Add found light to $lights
+			lights+=("${light[7]}:${light[8]}")
+			printf "Light found at: %s\n" "$light"
+		else
+			printf "Duplicate light found and ignored at: %s\n" "$light"
+		fi
+
+	done < <(avahi-browse -d local -t _elg._tcp --resolve -p)
+
+	# Save found lights into $CONFIG_FILE using jq
+	printf '%s\n' "${lights[@]}" | jq -R | jq -s > $CONFIG_FILE
+}
+
+#######################################
+# Toggle Elgato Lights
+# Globals:
+#   None
+# Arguments:
+#   action string (on|off|toggle)
+#   lights array of lights in format IP:Port
+# Outputs:
+#   None
+#######################################
+function toggle_lights() {
+	# Set local $lights to passed array
+	local lights=("$@")
+
+	for light in "${lights[@]}"; do
+		# Check the light "on" status and flip it
+		if [[ $(get_light_status "$light" "on") == "0" ]]; then
+			on=1
+		else
+			on=0
+		fi
+
+		# Set Light
+		set_light_status $light on=$on
+	done
+}
+
+#######################################
+# Get status on each Elgato Light
+# Globals:
+#   None
+# Arguments:
+#   lights array of lights in format IP:Port
+# Outputs:
+#   pretty printed JSON status object for each light
+#######################################
+function get_status_lights() {
+	# Set local $lights to passed array
+	local lights=("$@")
+
+	for light in "${lights[@]}"; do
+		echo "Status for light at $light:"
+		get_light_status $light | jq
+		echo
+	done
+}
+
+#######################################
+# Get Status on Elgato Light
+# Globals:
+#   None
+# Arguments:
+#   light string of light location in format IP:Port
+#   status optional string of status to get (on|brightness|temperature)
+# Outputs:
+#   JSON of status object, or individual status value
+#######################################
+function get_light_status() {
+	local light=$1
+	local status='';
+	if [[ "$2" != "" ]]; then
+		local status=".$2"
+	else
+		local status='';
+	fi
+
+	if [[ "$light" == "" ]]; then
+		return 1;
+	fi
+
+	echo `curl --silent --location --request GET "http://$light/elgato/lights" --header 'Accept: application/json' | jq ".lights[]$status"`
+}
+
+#######################################
+# Set status on each Elgato Light
+# Globals:
+#   None
+# Arguments:
+#   status elements (on|brightness|temperature) as named parameters like on=1 brightness=28 temperature=294
+#   lights array of lights in format IP:Port
+# Outputs:
+#   pretty printed JSON status object for each light
+#######################################
+function set_status_lights() {
+	local on brightness temperature status=()
+	for opt in "${@}"; do
+		if [[ ${opt:0:2} == "on" || ${opt:0:10} == "brightness" || ${opt:0:11} == "temperature" ]]; then
+			local ${opt};
+		fi
+	done
+
+	local status=()
+
+	if [ -n "${on}" ]; then
+		status+=('on='$on)
+		shift
+	fi
+	if [ -n "${brightness}" ]; then
+		status+=('brightness='$brightness)
+		shift
+	fi
+	if [ -n "${temperature}" ]; then
+		status+=('temperature='$temperature)
+		shift
+	fi
+
+	# Set local $lights to passed array
+	local lights=("$@")
+
+	for light in "${lights[@]}"; do
+		set_light_status $light "${status[@]}"
+	done
+}
+
+#######################################
+# Set Elgato Light status
+# Globals:
+#   None
+# Arguments:
+#   light string light in format IP:Port
+#   status elements (on|brightness|temperature) as named parameters like on=1 brightness=28 temperature=294
+# Outputs:
+#   None
+#######################################
+function set_light_status() {
+	local on brightness temperature status_json=()
+	local light=$1
+	shift
+	local "${@}"
+
+	if [ -n "${on}" ]; then
+		status_json+=('"on":'$on)
+	fi
+	if [ -n "${brightness}" ]; then
+		status_json+=('"brightness":'$brightness)
+	fi
+	if [ -n "${temperature}" ]; then
+		status_json+=('"temperature":'$temperature)
+	fi
+
+	# If there is no status to set
+	if [ ${#status_json[@]} -eq 0 ]; then
+		return
+	fi
+
+	status_json=$(IFS=,; echo "{${status_json[*]}}")
+
+	# Set Light
+	curl --silent --location --request PUT "http://$light/elgato/lights" --header 'Accept: application/json' --data-raw '{"numberOfLights":1,"lights":['$status_json']}' > /dev/null
+}
+
+#######################################
+# Make all Elgato Lights brighter (or dimmer) by passed amount
+# Globals:
+#   None
+# Arguments:
+#   adjustment int How much to adjust brightness by - positive number for brighter, negative for dimmer
+#   lights array of lights in format IP:Port
+# Outputs:
+#   None
+#######################################
+function lights_adjust_brightness() {
+	adj=$1
+	shift
+
+	# Set local $lights to passed array
+	local lights=("$@")
+
+	for light in "${lights[@]}"; do
+		# Get current brightness and adjust by specified amount
+		local brightness=$(($(get_light_status "$light" "brightness") + $adj ))
+
+		# If it's over 100 set to 100
+		if [ $brightness -gt 100 ]; then brightness=100; fi
+		# If it's less than 3 set to 3
+		if [ $brightness -lt 3 ]; then brightness=3; fi
+		
+		# Set Light
+		set_light_status $light brightness=$brightness
+	done
+}
+
+#######################################
+# Make all Elgato Lights warmer (or cooler) by passed amount
+# Globals:
+#   None
+# Arguments:
+#   adjustment int How much to adjust warmth by - positive number for warmer, negative for cooler
+#   lights array of lights in format IP:Port
+# Outputs:
+#   None
+#######################################
+function lights_adjust_temperature() {
+	adj=$1
+	shift
+	echo "In lights_adjust_temperature, adj is $adj"
+
+	# Set local $lights to passed array
+	local lights=("$@")
+
+	for light in "${lights[@]}"; do
+		# Get current temperature and adjust by specified amount
+		local temperature=$(($(get_light_status "$light" "temperature") + $adj ))
+
+		# If it's over 344 set to 344
+		if [ $temperature -gt 344 ]; then temperature=344; fi
+		# If it's less than 143 set to 143
+		if [ $temperature -lt 143 ]; then temperature=143; fi
+		
+		# Set Light
+		set_light_status $light temperature=$temperature
+	done
+}
+
+
+function usage() {
+	echo "Usage: $0 {toggle|on|off|status|brighter|dimmer|warmer|cooler|set [ -o ON on|off ] [ -b BRIGHTNESS 3-100 ] [ -t TEMPERATURE 2900-7000k ]}"
+}
+
+function exit_usage() {
+	usage
+	exit 1;
+}
+
+# Define empty lights array
+lights=()
+
+# set action to first parameter
+action=$1
+shift
+
+
+# If this is an attempt to find lights, then check for them
+# otherwise load them from $CONFIG_FILE
+if [[ ${action,,} == "find" || ${action,,} == "search" ]]; then
+	find_lights
+else
+	# Load lights from config file
+	lights=(`jq '.[]' -r $CONFIG_FILE`)
+
+	# If there are no lights, find them.
+	if [ ${#lights[@]} -eq 0 ]; then
+		echo "No lights in $CONFIG_FILE, searching."
+		find_lights
+	fi
+fi
+
+# Sometimes a search doesn't find them, so if we don't have them we try again.
+if [ ${#lights[@]} -eq 0 ]; then
+	echo "No lights found from search, trying again"
+	find_lights
+fi
+
+# process parameters
+case $action in
+	on)
+	set_status_lights on=1 "${lights[@]}"
+	# toggle_lights "on" "${lights[@]}"
+	;;
+	off)
+	set_status_lights on=0 "${lights[@]}"
+	# toggle_lights "off" "${lights[@]}"
+	;;
+	status)
+	get_status_lights "${lights[@]}"
+	;;
+	set)
+	# Set a status array that will be filled and concatenated to pass named parameters like on=1 brightness=28 temperature=294
+	status=()
+
+	# Check passed options
+	while getopts "o:b:t:" option; do
+		# Lowercase value
+		OPTARG=${OPTARG,,}
+
+		case "${option}" in
+		o)
+			if [[ ${OPTARG} == "on" || ${OPTARG} == "1" ]]; then
+				status+=("on=1")
+			elif [[ ${OPTARG} == "off" || ${OPTARG} == "0" ]]; then
+				status+=("on=0")
+			else
+				echo "Error: ON (-o) should be one of on|off"
+				exit_usage
+			fi
+		;;
+		b)
+			if [[ ! $OPTARG =~ ^[0-9]+$ ]]; then
+				echo "Error: BRIGHTNESS (-b) must be a whole number"
+				exit_usage
+			elif [[ ${OPTARG} -gt 100 || ${OPTARG} -lt 3 ]]; then
+				echo "Error: BRIGHTNESS (-b) must between 3 and 100"
+				exit_usage
+			else
+				status+=("brightness=${OPTARG}")
+			fi
+		;;
+		t)
+			# If TEMPERATURE ends in k (like 2900k or 7000K) then remove it
+			if [[ ${OPTARG: -1} == 'k' ]]; then
+				OPTARG=${OPTARG:0:-1}
+			fi
+			if [[ ! $OPTARG =~ ^[0-9]+$ ]]; then
+				echo "Error: TEMPERATURE (-t) must be a whole number"
+				exit_usage
+			elif [[ ${OPTARG} -gt 7000 || ${OPTARG} -lt 2900 ]]; then
+				echo "Error: TEMPERATURE (-t) must between 2900 and 7000"
+				exit_usage
+			else
+				# Temperature is 1,000,000 / Kelvin specified, rounded to whole number
+				OPTARG=$(printf "%.0f" $((1000000 / $OPTARG)))
+				status+=("temperature=${OPTARG}")
+			fi
+		;;
+		*)
+			exit_usage
+		;;
+		esac
+	done
+	set_status_lights "${status[@]}" "${lights[@]}"
+	;;
+	brighter)
+	lights_adjust_brightness 5 "${lights[@]}"
+	;;
+	dimmer)
+	lights_adjust_brightness -5 "${lights[@]}"
+	;;
+	warmer)
+	lights_adjust_temperature 5 "${lights[@]}"
+	;;
+	cooler)
+	lights_adjust_temperature -5 "${lights[@]}"
+	;;
+	toggle)
+	toggle_lights "${lights[@]}"
+	;;
+	*)
+	usage
+	exit 1
+	;;
+esac
+
+exit
