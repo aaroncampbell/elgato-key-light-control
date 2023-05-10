@@ -78,3 +78,51 @@ Status for light at 192.168.1.108:9123:
 > **Note**  
 > The temperature is specified as a number from 143-344. To calculate Kelvin use (1,000,000 / Temperature) and usually round the nearest 10 or 50 to match to most UIs.
 
+### Get Light Statuses
+Get Status for all lights
+```bash
+elgato info
+```
+
+Returns a list of lights, showing the location (IP:port) of each and a JSON representation of the info for each
+```
+Info for light at 192.168.1.107:9123:
+{
+  "productName": "Elgato Key Light Air",
+  "hardwareBoardType": 200,
+  "hardwareRevision": 1,
+  "macAddress": "00:00:00:00:00:00",
+  "firmwareBuildNumber": 218,
+  "firmwareVersion": "1.0.3",
+  "serialNumber": "XX00X0X00000",
+  "displayName": "Desk Right",
+  "features": [
+    "lights"
+  ],
+  "wifi-info": {
+    "ssid": "ssid_name",
+    "frequencyMHz": 2400,
+    "rssi": -29
+  }
+}
+
+Status for light at 192.168.1.108:9123:
+{
+  "productName": "Elgato Key Light Air",
+  "hardwareBoardType": 200,
+  "hardwareRevision": 1,
+  "macAddress": "00:00:00:00:00:00",
+  "firmwareBuildNumber": 218,
+  "firmwareVersion": "1.0.3",
+  "serialNumber": "XX00X0X00000",
+  "displayName": "Desk Left",
+  "features": [
+    "lights"
+  ],
+  "wifi-info": {
+    "ssid": "ssid_name",
+    "frequencyMHz": 2400,
+    "rssi": -29
+  }
+}
+```

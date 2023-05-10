@@ -17,6 +17,8 @@ CONFIG_FILE="$HOME/.config/elgato.control.json"
 function find_lights() {
 	echo "Finding Lights"
 
+	local light_objects=()
+
 	# Read from avahi-brows into $light
 	while read -r light
 	do
@@ -39,9 +41,26 @@ function find_lights() {
 		#   -x/--line-regexp - Select only those matches that exactly match the whole line.
 		#   -- - marks the end of command-line options, making Grep process "myvalue" as a non-option argument even if it starts with a dash
 		if ! printf '%s\0' "${lights[@]}" | grep -Fxqz -- "$light"; then
-			# Add found light to $lights
-			lights+=("${light[7]}:${light[8]}")
-			printf "Light found at: %s\n" "$light"
+
+			# Add the found light to the lights array
+			lights+=( "$light" )
+			
+			# Get the name of the found light
+			local name=$(get_light_info "$light" "displayName")
+
+			# Add the light name to the light_names array
+			light_names+=( "$name" )
+
+			# Add name and location to an associative array
+			declare -A light=( [name]="$name" [light]="$light" )
+
+			# Convert the array to json
+			light=$(array_to_json light)
+
+			# Add the json light object to the light_objects array
+			light_objects+=( "$light" )
+
+			printf "Light named '%s' found at: %s\n" "${light[name]}" "${light[light]}"
 		else
 			printf "Duplicate light found and ignored at: %s\n" "$light"
 		fi
@@ -49,7 +68,7 @@ function find_lights() {
 	done < <(avahi-browse -d local -t _elg._tcp --resolve -p)
 
 	# Save found lights into $CONFIG_FILE using jq
-	printf '%s\n' "${lights[@]}" | jq -R | jq -s > $CONFIG_FILE
+	printf '%s\n' "${light_objects[@]}" | jq | jq -s > $CONFIG_FILE
 }
 
 #######################################
@@ -266,9 +285,69 @@ function lights_adjust_temperature() {
 	done
 }
 
+#######################################
+# Get info on each Elgato Light
+# Globals:
+#   None
+# Arguments:
+#   lights array of lights in format IP:Port
+# Outputs:
+#   pretty printed JSON info object for each light
+#######################################
+function get_info_lights() {
+	# Set local $lights to passed array
+	local lights=("$@")
+
+	for light in "${lights[@]}"; do
+		echo "Info for light at $light:"
+		get_light_info $light | jq
+		echo
+	done
+}
+
+#######################################
+# Get Info on Elgato Light
+# Globals:
+#   None
+# Arguments:
+#   light string of light location in format IP:Port
+#   info optional string of info to get (productName|hardwareBoardType|firmwareBuildNumber|firmwareVersion|serialNumber|displayName|features|wifi-info)
+# Outputs:
+#   JSON of info object, or individual info value
+#######################################
+function get_light_info() {
+	local light=$1
+	local info='';
+	if [[ "$2" != "" ]]; then
+		local info=".$2"
+	else
+		local info='';
+	fi
+
+	if [[ "$light" == "" ]]; then
+		return 1;
+	fi
+
+	echo `curl --silent --location --request GET "http://$light/elgato/accessory-info" --header 'Accept: application/json' | jq -r "$info"`
+}
+
+#https://stackoverflow.com/questions/44792241/constructing-a-json-object-from-a-bash-associative-array
+function array_to_json() {
+	# Use named parameter to pass associative array
+	local -n dict=$1
+
+	for key in "${!dict[@]}"; do
+		printf '%s\0%s\0' "$key" "${dict[$key]}"
+	done |
+	jq -Rsc '
+	split("\u0000")
+	| . as $a
+	| reduce range(0; length/2) as $i 
+		({}; . + {($a[2*$i]): ($a[2*$i + 1]|fromjson? // .)})'
+}
 
 function usage() {
-	echo "Usage: $0 {toggle|on|off|status|brighter|dimmer|warmer|cooler|set [ -o ON on|off ] [ -b BRIGHTNESS 3-100 ] [ -t TEMPERATURE 2900-7000k ]}"
+	echo "Usage: $0 {toggle|on|off|status|info|brighter|dimmer|warmer|cooler|set [ -o ON on|off ] [ -b BRIGHTNESS 3-100 ] [ -t TEMPERATURE 2900-7000k ]}"
 }
 
 function exit_usage() {
@@ -278,19 +357,26 @@ function exit_usage() {
 
 # Define empty lights array
 lights=()
+light_names=()
 
 # set action to first parameter
-action=$1
+action=${1,,}
 shift
 
 
 # If this is an attempt to find lights, then check for them
 # otherwise load them from $CONFIG_FILE
-if [[ ${action,,} == "find" || ${action,,} == "search" ]]; then
+if [[ $action == "find" || $action == "search" ]]; then
 	find_lights
 else
 	# Load lights from config file
-	lights=(`jq '.[]' -r $CONFIG_FILE`)
+	lights=(`jq 'map(.light) | .[]' -r $CONFIG_FILE`)
+	
+	# Load light names from config file
+	while read -r t;
+	do
+		light_names+=("${t}")
+	done < <(jq 'map(.name) | .[]' -r $CONFIG_FILE)
 
 	# If there are no lights, find them.
 	if [ ${#lights[@]} -eq 0 ]; then
@@ -387,6 +473,13 @@ case $action in
 	;;
 	toggle)
 	toggle_lights "${lights[@]}"
+	;;
+	info)
+	get_info_lights "${lights[@]}"
+	;;
+	search)
+	;;
+	find)
 	;;
 	*)
 	usage
