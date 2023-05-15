@@ -269,7 +269,7 @@ def command_list( args ):
         print( f"[{index+1}] {light['name']} ({light['light']})\n" )
 
 parser = argparse.ArgumentParser( description='Control Elgato Lights.' )
-subparsers = parser.add_subparsers( title='command', help='sub-command help' )
+subparsers = parser.add_subparsers( title='commands', metavar='Use -h or --help with any command for command-specific help' )
 
 parser_list = subparsers.add_parser('list', help='List lights')
 parser_list.set_defaults( func=command_list )
@@ -317,3 +317,6 @@ args = parser.parse_args()
 if hasattr( args, 'func' ) and callable( args.func ):
     args.func( vars( args ) )
     sys.exit()
+
+# If no function was found to process, show help
+parser.print_help()
