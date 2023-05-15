@@ -46,9 +46,6 @@ class ElgatoListener():
         # Announce that a light was found
         print( "%s found at: %s" % (light_name, light))
 
-class Object(object):
-    pass
-
 def find_lights( interactive:bool=True ):
     print( "Finding Lights" )
 
