@@ -274,34 +274,34 @@ subparsers = parser.add_subparsers( title='command', help='sub-command help' )
 parser_list = subparsers.add_parser('list', help='List lights')
 parser_list.set_defaults( func=command_list )
 
-parser_toggle = subparsers.add_parser('toggle', help='toggle')
+parser_toggle = subparsers.add_parser('toggle', help='Toggle lights on or off')
 parser_toggle.set_defaults( func=command_toggle )
 
-parser_on = subparsers.add_parser('on', help='on')
+parser_on = subparsers.add_parser('on', help='Turn lights on')
 parser_on.set_defaults( func=command_on )
 
-parser_off = subparsers.add_parser('off', help='off')
+parser_off = subparsers.add_parser('off', help='Turn lights off')
 parser_off.set_defaults( func=command_off )
 
-parser_status = subparsers.add_parser('status', help='Check the status of all lights or specified lights')
+parser_status = subparsers.add_parser('status', help='Check the status of lights')
 parser_status.set_defaults( func=command_status )
 
-parser_info = subparsers.add_parser('info', help='info')
+parser_info = subparsers.add_parser('info', help='Get info on lights')
 parser_info.set_defaults( func=command_info )
 
-parser_brighter = subparsers.add_parser('brighter', help='brighter')
+parser_brighter = subparsers.add_parser('brighter', help='Make lights brighter')
 parser_brighter.set_defaults( func=command_brighter )
 
-parser_dimmer = subparsers.add_parser('dimmer', help='dimmer')
+parser_dimmer = subparsers.add_parser('dimmer', help='Make lights dimmer')
 parser_dimmer.set_defaults( func=command_dimmer )
 
-parser_warmer = subparsers.add_parser('warmer', help='warmer')
+parser_warmer = subparsers.add_parser('warmer', help='Adjust temperature of lights warmer')
 parser_warmer.set_defaults( func=command_warmer )
 
-parser_cooler = subparsers.add_parser('cooler', help='cooler')
+parser_cooler = subparsers.add_parser('cooler', help='Adjust temperature of lights cooler')
 parser_cooler.set_defaults( func=command_cooler )
 
-parser_set = subparsers.add_parser('set', help='set')
+parser_set = subparsers.add_parser('set', help='Set status for lights, including on/off, brightness, and temperature')
 parser_set.set_defaults( func=command_set )
 on_off_group = parser_set.add_mutually_exclusive_group()
 on_off_group.add_argument( '-o', dest='on', type=on_off_to_bool, help='Whether to set the light(s) on or off', metavar='ON|OFF')
@@ -310,8 +310,10 @@ on_off_group.add_argument('--off', action='store_false', dest='on')
 parser_set.add_argument( '-b', '--brightness', type=brightness_value, help='Brightness for light - percentage from 3 to 100', metavar="3-100")
 parser_set.add_argument( '-t', '--temperature', type=temperature_value, help='Temperature for light - Kelvin from 2900k - 7000k (increments of 50)', metavar="2900-7000k (increments of 50)")
 
-
 parser.add_argument( '--version', action='version', version='%(prog)s 0.0.1' )
 
 args = parser.parse_args()
-args.func( vars( args ) )
+
+if hasattr( args, 'func' ) and callable( args.func ):
+    args.func( vars( args ) )
+    sys.exit()
