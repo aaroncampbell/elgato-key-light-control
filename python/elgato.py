@@ -412,7 +412,7 @@ parser_warmer.set_defaults( func=command_warmer )
 parser_cooler = subparsers.add_parser('cooler', help='Adjust temperature of lights cooler', parents=[parent_parser] )
 parser_cooler.set_defaults( func=command_cooler )
 
-parser_set = subparsers.add_parser('set', help='Set status for lights, including on/off, brightness, and temperature')
+parser_set = subparsers.add_parser('set', help='Set status for lights, including on/off, brightness, and temperature', parents=[parent_parser])
 parser_set.set_defaults( func=command_set )
 on_off_group = parser_set.add_mutually_exclusive_group()
 on_off_group.add_argument( '-o', dest='on', type=on_off_to_bool, help='Whether to set the light(s) on or off', metavar='ON|OFF')
