@@ -380,8 +380,19 @@ def kelvin_to_temperature( kelvin:int ) -> int:
     return round( 1000000 / kelvin )
 
 def on_off_to_bool( string:str ) -> bool:
-    if not isinstance( string, str ):
+    """Converts a string representing on/off to bool
+
+    Args:
+        string (str): String representing on/off [on, off, 1, 0]
+
+    Returns:
+        bool: _description_
+    """
+    if isinstance( string, bool ): # If this is already boolean, return it
+        return string
+    if not isinstance( string, str ): # If it's not a string, then convert
         string = str( string )
+    # Return True in cases of 'on' or '1'. Assume all others are off and return False
     return string.lower() == 'on' or string == '1'
 
 def resolve_to_on_off( string:str ) -> bool:
