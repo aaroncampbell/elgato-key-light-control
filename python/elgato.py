@@ -332,6 +332,9 @@ subparsers = parser.add_subparsers( title='commands', metavar='Use -h or --help 
 parent_parser = argparse.ArgumentParser(add_help=False)
 parent_parser.add_argument( '--light', dest='lights', action='append', metavar='LIGHT', help='Light to target as number (from %(prog)s list) or IP:PORT. Can include multiple times.' )
 
+parser_find = subparsers.add_parser('find', aliases=['search'], help='Find lights' )
+parser_find.set_defaults( func=find_lights )
+
 parser_list = subparsers.add_parser('list', help='List lights', parents=[parent_parser] )
 parser_list.set_defaults( func=command_list )
 
