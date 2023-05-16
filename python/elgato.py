@@ -373,16 +373,6 @@ def get_lights( requested_lights:list=[] ) -> list:
 
         return lights
 
-def get_light_location( light ) -> str:
-    if isinstance( light, str ):
-        return light
-    if isinstance( light, dict ):
-        return light['light']
-    if isinstance( light, Light):
-        return light.location
-    if isinstance( light, object):
-        return light.light
-
 def temperature_to_kelvin( temperature:int ) -> int:
     return 50 * round( 1000000 / temperature / 50 )
 
