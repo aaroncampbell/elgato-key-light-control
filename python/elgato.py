@@ -12,7 +12,7 @@ from zeroconf import ServiceBrowser, Zeroconf # for discovery
 
 config_file = os.path.expanduser('~/.config/elgato.control.json')
 default_port = 9123 # Port to use when IP is specified without port
-lights = []
+lights = [] # Global that holds list of light obects
 
 class ElgatoListener():
     """Class listens for services being added, removed, or updated - used to locate lights
@@ -30,15 +30,14 @@ class ElgatoListener():
         # Get info from found service
         info = zc.get_service_info(type_, name)
 
-        # addresses seems to be a single item array of addresses stored in binary network byte order
-        # IP is pulled from the first item of the array, converted to IPv4 using socket.inet_ntoa
+        # addresses seems to be a single item array of addresses stored in
+        # binary network byte order. IP is pulled from the first item of the
+        # array and converted to IPv4 using socket.inet_ntoa
         # Light is IP:Port
         light = socket.inet_ntoa(info.addresses[0]) + ':' + str(info.port)
 
+        # Pull light name from the displayName retrieved from the info enpoint
         light_name = get_light_info( light, "displayName" )
-        # light object includes name and "light" stored as IP:Port
-        # print("IP tpye: %s, Port type: %s" % (type( socket.inet_ntoa(info.addresses[0]) ), type(info.port)) )
-        # light={ "name": info.get_name(), "light": light}
 
         # Append found light to lights array
         self.lights.append( { "name": light_name, "light": light} )
@@ -46,18 +45,22 @@ class ElgatoListener():
         # Announce that a light was found
         print( "%s found at: %s" % (light_name, light))
 
-def find_lights( interactive:bool=True ):
-    print( "Finding Lights" )
+def find_lights( interactive:bool=True ) -> list:
+    """Listens for lights, saves the list into the config file, and returns the list
 
-    # from zeroconf import ZeroconfServiceTypes
-    # print('\n'.join(ZeroconfServiceTypes.find()))
+    Args:
+        interactive (bool, optional): interactive prompts user to verify completion. Defaults to True.
+
+    Returns:
+        list: List of light objects
+    """
+    print( "Finding Lights" )
 
     zeroconf = Zeroconf()
     listener = ElgatoListener()
-    browser = ServiceBrowser(zeroconf, "_elg._tcp.local.", listener)
-    # browser = ServiceBrowser(zeroconf, "_alexa._tcp.local.", listener)
-    # browser = ServiceBrowser(zeroconf, "_http._tcp.local.", listener)
-    # browser = ServiceBrowser(zeroconf, "_googlecast._tcp.local.", listener)
+    # Elgato lights can be found using '_elg._tcp.local.'
+    ServiceBrowser(zeroconf, "_elg._tcp.local.", listener)
+
     try:
         count = 0
         # Keep looking until the user says we have found them all
@@ -85,21 +88,33 @@ def find_lights( interactive:bool=True ):
         with open( config_file, "w" ) as f:
             f.write( json.dumps( listener.lights, indent="\t" ) )
 
+    # Return list of light objects
     return listener.lights
 
 def is_light_number( light_number:str ) -> bool:
+    """Used to see if a specified light is actually a valid number from the list of lights
+
+    Args:
+        light_number (str): Number corresponding to a light in the list (index - 1)
+
+    Returns:
+        bool: True if it can represent a known light, False if not
+    """
     try:
-        light_number = int( light_number )
+        light_number = int( light_number ) # See if the string is in an int
     except ValueError:
         return False # not an int, can't be a light number
     else:
         global lights
+        # Return whether the number is between 1 & the number of lights we have
         return True if len( lights ) >= light_number and light_number > 0 else False
 
 def maybe_load_lights_from_config():
+    """If the lights global is empty, loads lights from the config file into into
+    """
     global lights
 
-    if not lights:
+    if not lights: # If global is empty
         try:
             with open( config_file ) as f:
                 lights = json.load(f)
@@ -107,32 +122,60 @@ def maybe_load_lights_from_config():
             pass
 
 def exit_with_help( error:str='' ):
+    """Prints usage, then optional error string, then exits with a code of 1
+
+    Args:
+        error (str, optional): Error string to print below usage before exiting.
+    """
     global parser
     parser.print_usage()
     if error:
         print( error )
     sys.exit(1)
 
-def get_lights( requested_lights:list=[]):
+def get_lights( requested_lights:list=[] ) -> list:
+    """Gets a list of lights
+
+    If requested_lights is specified, checks that they are possible lights
+    Otherwise pulls lights from the config file, falling back to searching if
+    there are none
+
+    Args:
+        requested_lights (list, optional): Lights to check and return. Defaults to [] which is "All".
+
+    Returns:
+        list: List of light objects
+    """
     global lights
 
-    if requested_lights:
+    if requested_lights: # If requested lights were specified
+        # Lights need to be loaded in order to support using light numbers as
+        # shorthand. Since there's no way to know what order lights will return
+        # in when searching, it only makes sense to reference them this way from
+        # the config file where they can be seen using the `list` command
         maybe_load_lights_from_config()
 
+        # Use enumerate to loop through requested_lights so we can modify each
+        # item in the list to be a light object as we validate it
         for i, light in enumerate( requested_lights ):
             if is_light_number( light ):
+                # If this is a light number, replace the current item with the
+                # specified one from the lights global
                 requested_lights[i] = lights[int(light)-1]
             else:
                 try:
-                    if ':' in light:
+                    if ':' in light: # If there's a ':' assume it's IP:PORT
                         ip, port = light.split( ':', 1 )
                     else:
+                        # Assume the light was just an IP
                         ip = light
+                        # If no port it specified then set it empty to fill later
                         port = ''
 
+                    # If the IP is valid this will work. If not it will raise a ValueError
                     ip = ipaddress.ip_address( ip )
 
-                    if not port:
+                    if not port: # if port is empty set it to the default port
                         global default_port
                         port = default_port
                     else:
@@ -142,12 +185,16 @@ def get_lights( requested_lights:list=[]):
                         except ValueError:
                             exit_with_help( f"Invalid port specified for light {light}" )
 
+                    # We have a valid IP and Port so set current item to a light
+                    # object using original specified string as name and setting
+                    # light to IP:Port
                     requested_lights[i] = { 'name': light, 'light': ':'.join( [str(ip), str(port)] ) }
-                except ValueError as e:
+                except ValueError as e: # from ipaddress.ip_address() for invalid IP
                     exit_with_help( f"Invalid light specified: {light}" )
 
+        # All requests lights could be valid, set the lights global to the specified list
         lights = requested_lights
-        return lights
+        return lights # return requested lights
     else: # Lights weren't specified, default to all
         # Load lights from the config file into the global if it is empty
         maybe_load_lights_from_config()
