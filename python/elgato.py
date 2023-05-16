@@ -147,18 +147,18 @@ def get_lights( requested_lights:list=[]):
                     exit_with_help( f"Invalid light specified: {light}" )
 
         lights = requested_lights
-
-    if lights:
         return lights
+    else: # Lights weren't specified, default to all
+        # Load lights from the config file into the global if it is empty
+        maybe_load_lights_from_config()
 
-    try:
-        with open( config_file ) as f:
-            lights = json.load(f)
-    except (FileNotFoundError, ValueError) as e:
+        if lights: # If we have lights in the global, return them
+            return lights
+
         # Find lights in non-interative mode
         lights = find_lights( False )
 
-    return lights
+        return lights
 
 def get_light_status( light: str, status: str='' ) -> str:
     response = requests.get( f"http://{get_light_location( light )}/elgato/lights" )
