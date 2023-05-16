@@ -14,6 +14,52 @@ config_file = os.path.expanduser('~/.config/elgato.control.json')
 default_port = 9123 # Port to use when IP is specified without port
 lights = [] # Global that holds list of light obects
 
+class Light():
+    def __init__(self, name, location) -> None:
+        self.name = name
+        self.location = location
+
+def light_to_json( obj:Light ) -> dict:
+    """Takes a Light object and turns it to a simple dict for easy JSON encoding
+
+    Passes through any object that's not a Light so it can be used as 'default'
+    parameter value for json.dump/dumps
+
+    Args:
+        obj (Light): Light to be converted to dict
+
+    Returns:
+        dict: Simple dict representation of light - 'name' and 'light' (location)
+    """
+    # If 'light' is an element in the object, we assume it's a Light object
+    if isinstance( obj, Light ): # If this is a Light
+        # Change "location" to "light" and return as dict with only name
+        # and location for storing as JSON
+        return { 'name': obj.name, 'light': obj.location }
+
+    # Default behavior for all other types
+    return obj
+
+def light_from_json( dct:dict ) -> Light:
+    """Takes dict representing light and returns a Light object for use in JSON decoding
+
+    Passes through any dict that doesn't have a 'light' element so it can be
+    used as 'object_hook' parameter value for json.load/loads
+
+    Args:
+        dct (dict): Simple dict representation of light - 'name' and 'light' (location)
+
+    Returns:
+        Light: Light created from data in dict
+    """
+    # If 'light' is an element in the dict, we assume it's a Light object
+    if 'light' in dct:
+        # Move "light" back to "location" and create Light object
+        return Light( name=dct['name'], location=dct['light'] )
+
+    # Default behavior for all other types
+    return dct
+
 class ElgatoListener():
     """Class listens for services being added, removed, or updated - used to locate lights
     """
@@ -40,10 +86,10 @@ class ElgatoListener():
         light_name = get_light_info( light, "displayName" )
 
         # Append found light to lights array
-        self.lights.append( { "name": light_name, "light": light} )
+        self.lights.append( Light( name=light_name, location=light ) )
 
         # Announce that a light was found
-        print( "%s found at: %s" % (light_name, light))
+        print( "%s found at: %s" % ( light_name, light ) )
 
 def find_lights( interactive:bool=True ) -> list:
     """Listens for lights, saves the list into the config file, and returns the list
@@ -52,7 +98,7 @@ def find_lights( interactive:bool=True ) -> list:
         interactive (bool, optional): interactive prompts user to verify completion. Defaults to True.
 
     Returns:
-        list: List of light objects
+        list: List of Light objects
     """
     print( "Finding Lights" )
 
@@ -86,9 +132,9 @@ def find_lights( interactive:bool=True ) -> list:
     # If we found lights, save them to the config file
     if listener.lights:
         with open( config_file, "w" ) as f:
-            f.write( json.dumps( listener.lights, indent="\t" ) )
+            f.write( json.dumps( listener.lights, default=light_to_json, indent="\t" ) )
 
-    # Return list of light objects
+    # Return list of Light objects
     return listener.lights
 
 def is_light_number( light_number:str ) -> bool:
@@ -117,7 +163,7 @@ def maybe_load_lights_from_config():
     if not lights: # If global is empty
         try:
             with open( config_file ) as f:
-                lights = json.load(f)
+                lights = json.load( f, object_hook=light_from_json )
         except:
             pass
 
@@ -144,7 +190,7 @@ def get_lights( requested_lights:list=[] ) -> list:
         requested_lights (list, optional): Lights to check and return. Defaults to [] which is "All".
 
     Returns:
-        list: List of light objects
+        list: List of Light objects
     """
     global lights
 
@@ -156,7 +202,7 @@ def get_lights( requested_lights:list=[] ) -> list:
         maybe_load_lights_from_config()
 
         # Use enumerate to loop through requested_lights so we can modify each
-        # item in the list to be a light object as we validate it
+        # item in the list to be a Light object as we validate it
         for i, light in enumerate( requested_lights ):
             if is_light_number( light ):
                 # If this is a light number, replace the current item with the
@@ -188,7 +234,7 @@ def get_lights( requested_lights:list=[] ) -> list:
                     # We have a valid IP and Port so set current item to a light
                     # object using original specified string as name and setting
                     # light to IP:Port
-                    requested_lights[i] = { 'name': light, 'light': ':'.join( [str(ip), str(port)] ) }
+                    requested_lights[i] = Light( name=light, location= ':'.join( [str(ip), str(port)] ) )
                 except ValueError as e: # from ipaddress.ip_address() for invalid IP
                     exit_with_help( f"Invalid light specified: {light}" )
 
@@ -269,6 +315,8 @@ def get_light_location( light ) -> str:
         return light
     if isinstance( light, dict ):
         return light['light']
+    if isinstance( light, Light):
+        return light.location
     if isinstance( light, object):
         return light.light
 
@@ -327,15 +375,15 @@ def command_off( args ):
 def command_status( args ):
     lights = get_lights( args['lights'] )
     for light in lights:
-        print( f"Status for {light['name']}:" )
-        print( json.dumps( friendly_status( get_light_status( light["light"] ) ), indent=4 ) )
+        print( f"Status for {light.name}:" )
+        print( json.dumps( friendly_status( get_light_status( light ) ), default=light_to_json, indent=4 ) )
 
 def command_info( args ):
     lights = get_lights( args['lights'] )
 
     for light in lights:
-        print( f"Info for {light['name']}:" )
-        print( json.dumps( get_light_info( light["light"] ), indent=4 ) )
+        print( f"Info for {light.name}:" )
+        print( json.dumps( get_light_info( light ), default=light_to_json, indent=4 ) )
 
 def command_brighter( args ):
     lights = get_lights( args['lights'] )
@@ -371,7 +419,7 @@ def command_list( args ):
     lights = get_lights( args['lights'] )
 
     for index, light in enumerate( lights ):
-        print( f"[{index+1}] {light['name']} ({light['light']})" )
+        print( f"[{index+1}] {light.name} ({light.location})" )
 
 parser = argparse.ArgumentParser( description='Control Elgato Lights.' )
 subparsers = parser.add_subparsers( title='commands', metavar='Use -h or --help with any command for command-specific help' )
