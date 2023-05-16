@@ -395,14 +395,6 @@ def on_off_to_bool( string:str ) -> bool:
     # Return True in cases of 'on' or '1'. Assume all others are off and return False
     return string.lower() == 'on' or string == '1'
 
-def resolve_to_on_off( string:str ) -> bool:
-    string = string.lower()
-    if string == '1':
-        return 'on'
-    elif string == '0':
-        return 'off'
-    return string
-
 def brightness_from_str( brightness:str ) -> int|bool:
     # If brightness is a string ending in '%', trim the '%'
     if isinstance( brightness, str ) and brightness[-1] == '%':
