@@ -41,6 +41,24 @@ class Light():
 
         return self.status
 
+    def friendly_status( self ) -> dict:
+        """Get status, convert it to friendly format, and return it
+
+        Status includes:
+          on/off shown as string
+          brightness shown as numerical percent
+          temperature shown as Kelvin
+
+        Returns:
+            dict: Light status made more user-friendly
+        """
+        status = self.get_status()
+        status['on'] = 'on' if status['on'] else 'off'
+        status['brightness'] = str( status['brightness'] ) + '%'
+        status['temperature'] = str( temperature_to_kelvin( status['temperature'] ) ) + 'K'
+
+        return status
+
     def set_status( self, on:str|bool=None, brightness:str|int=None, temperature:str|int=None, **_) -> bool:
         """Set the status for light using endpoint
         Status includes:
@@ -355,13 +373,6 @@ def get_lights( requested_lights:list=[] ) -> list:
 
         return lights
 
-def friendly_status( status:dict ) -> dict:
-    status['on'] = 'on' if status['on'] else 'off'
-    status['brightness'] = str( status['brightness'] ) + '%'
-    status['temperature'] = str( temperature_to_kelvin( status['temperature'] ) ) + 'K'
-
-    return status
-
 def get_light_location( light ) -> str:
     if isinstance( light, str ):
         return light
@@ -391,9 +402,33 @@ def resolve_to_on_off( string:str ) -> bool:
         return 'off'
     return string
 
+def brightness_from_str( brightness:str ) -> int|bool:
+    # If brightness is a string ending in '%', trim the '%'
+    if isinstance( brightness, str ) and brightness[-1] == '%':
+        brightness = brightness[0:-1]
+
+    try:
+        return int( brightness ) # Return brightness as an int
+    except ValueError:
+        return False # not an int, can't be a brightness
+
+
+def is_valid_brightness( brightness:int ) -> bool:
+    # If not already an int, enforce that
+    if not isinstance( brightness, int ):
+        brightness = brightness_from_str( brightness=brightness )
+
+    # True if 3-100, False otherwise
+    return not ( brightness > 100 or brightness < 3 )
+
 def brightness_value( brightness_string:str ) -> int:
-    brightness = int( brightness_string )
-    if brightness > 100 or brightness < 3:
+    if isinstance( brightness, int ):
+        brightness = brightness_string # already an int, just use it
+    else:
+        # Normalize strings like '50' or '50%' to int
+        brightness = brightness_from_str( brightness=brightness_string )
+
+    if not is_valid_brightness( brightness ):
         raise argparse.ArgumentTypeError( "invalid brightness value: %r (valid is whole number 3-100)" % brightness_string )
     return brightness
 
@@ -428,7 +463,7 @@ def command_status( args ):
     lights = get_lights( args['lights'] )
     for light in lights:
         print( f"Status for {light.name}:" )
-        print( json.dumps( friendly_status( light.get_status() ), default=light_to_json, indent=4 ) )
+        print( json.dumps( light.friendly_status(), default=light_to_json, indent=4 ) )
 
 def command_info( args ):
     lights = get_lights( args['lights'] )
@@ -472,6 +507,14 @@ def command_list( args ):
 
     for index, light in enumerate( lights ):
         print( f"[{index+1}] {light.name} ({light.location})" )
+
+def command_test( args ):
+    lights = get_lights( args['lights'] )
+    test = [ -1, 0, 1, 3, 100, 123, '3', '100', 'abc' ]
+
+    for brightness in test:
+        valid = is_valid_brightness( brightness )
+        print( f"Testing '{brightness}', result: {valid}" )
 
 parser = argparse.ArgumentParser( description='Control Elgato Lights.' )
 subparsers = parser.add_subparsers( title='commands', metavar='Use -h or --help with any command for command-specific help' )
@@ -522,6 +565,10 @@ parser_set.add_argument( '-b', '--brightness', type=brightness_value, help='Brig
 parser_set.add_argument( '-t', '--temperature', type=temperature_value, help='Temperature for light - Kelvin from 2900k - 7000k (increments of 50)', metavar="2900-7000k (increments of 50)")
 
 parser.add_argument( '--version', action='version', version='%(prog)s 0.0.1' )
+
+parser_test = subparsers.add_parser('test', help='For Testing', parents=[parent_parser] )
+parser_test.set_defaults( func=command_test )
+
 
 args = parser.parse_args()
 
