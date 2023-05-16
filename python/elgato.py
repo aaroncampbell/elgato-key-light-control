@@ -75,6 +75,7 @@ class Light():
             # Trim 'k' if it's there
             if isinstance( temperature, str ) and temperature[-1].lower() == 'k':
                 temperature = temperature[0:-1]
+            # If temperature is >= 2900 it's probably Kelvin - convert it
             if temperature >= 2900:
                 temperature = kelvin_to_temperature( temperature )
             status['temperature'] = temperature
@@ -88,6 +89,37 @@ class Light():
         response = requests.put( f"http://{self.location}/elgato/lights", json=status )
 
         return response.ok
+
+    def get_info( self, info: str='' ) -> dict|str|list|int:
+        """Get info from light using endpoint
+        Info includes:
+            productName: str
+            hardwareBoardType: int
+            hardwareRevision: int
+            macAddress: str
+            firmwareBuildNumber: int
+            firmwareVersion: str
+            serialNumber: str
+            displayName: str
+            features: list,
+            wifi-info: dict
+                ssid: str
+                frequencyMHz: int
+                rssi: int
+
+        Args:
+            info (str, optional): specific item to get from info. Defaults to All.
+
+        Returns:
+            dict|int: Dict of status results or dict|str|list|int representing value of specified info
+        """
+        response = requests.get( f"http://{self.location}/elgato/accessory-info" )
+        self.info = response.json()
+
+        if info: # If a specific info item was requested
+            return self.info.get( info )
+
+        return self.info
 
 def light_to_json( obj:Light ) -> dict:
     """Takes a Light object and turns it to a simple dict for easy JSON encoding
@@ -150,16 +182,16 @@ class ElgatoListener():
         # binary network byte order. IP is pulled from the first item of the
         # array and converted to IPv4 using socket.inet_ntoa
         # Light is IP:Port
-        light = socket.inet_ntoa(info.addresses[0]) + ':' + str(info.port)
+        light = Light( location=socket.inet_ntoa(info.addresses[0]) + ':' + str(info.port), name='' )
 
         # Pull light name from the displayName retrieved from the info enpoint
-        light_name = get_light_info( light, "displayName" )
+        light.name = light.get_info( "displayName" )
 
         # Append found light to lights array
-        self.lights.append( Light( name=light_name, location=light ) )
+        self.lights.append( light )
 
         # Announce that a light was found
-        print( "%s found at: %s" % ( light_name, light ) )
+        print( "%s found at: %s" % ( light.name, light.location ) )
 
 def find_lights( interactive:bool=True ) -> list:
     """Listens for lights, saves the list into the config file, and returns the list
@@ -323,15 +355,6 @@ def get_lights( requested_lights:list=[] ) -> list:
 
         return lights
 
-def get_light_info( light: str, info: str='' ) -> str:
-    response = requests.get( f"http://{get_light_location( light )}/elgato/accessory-info" )
-    light_info = response.json()
-
-    if info:
-        light_info = light_info.get( info )
-
-    return light_info
-
 def friendly_status( status:dict ) -> dict:
     status['on'] = 'on' if status['on'] else 'off'
     status['brightness'] = str( status['brightness'] ) + '%'
@@ -412,7 +435,7 @@ def command_info( args ):
 
     for light in lights:
         print( f"Info for {light.name}:" )
-        print( json.dumps( get_light_info( light ), default=light_to_json, indent=4 ) )
+        print( json.dumps( light.get_info(), default=light_to_json, indent=4 ) )
 
 def command_brighter( args ):
     lights = get_lights( args['lights'] )
