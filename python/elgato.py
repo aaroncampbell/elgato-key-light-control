@@ -41,6 +41,54 @@ class Light():
 
         return self.status
 
+    def set_status( self, on:str|bool=None, brightness:str|int=None, temperature:str|int=None, **_) -> bool:
+        """Set the status for light using endpoint
+        Status includes:
+          on/off
+          brightness
+          temperature
+
+        Args:
+            on (str | bool, optional): On|Off
+            brightness (str | int, optional): Brightness as a percent - 3-100.
+            temperature (str | int, optional): temperature as Kelvin (2900-7000) or raw number (143-344 which is 1000000/Kelvin).
+
+        Returns:
+            bool: success
+        """
+        status = {}
+
+        if not on is None: # If on was specified
+            if not isinstance( on, bool ): # If it's not already bool
+                on = on_off_to_bool( on ) # convert to bool
+            status['on'] = 1 if on else 0 # Light expects value of 1 or 0
+
+        # TODO: Validate brightness as int 3-100
+        if not brightness is None: # If brightness was specified
+            # Trim % sign if it's there
+            if isinstance( brightness, str ) and brightness[-1] == '%':
+                brightness = brightness[0:-1]
+            status['brightness'] = brightness
+
+        # TODO: Validate temperature to be 143-344 (2900-7000k)
+        if not temperature is None: # If temperature was specified
+            # Trim 'k' if it's there
+            if isinstance( temperature, str ) and temperature[-1].lower() == 'k':
+                temperature = temperature[0:-1]
+            if temperature >= 2900:
+                temperature = kelvin_to_temperature( temperature )
+            status['temperature'] = temperature
+
+        if not status:
+            print( "Nothing to set. Please specify on, brightness, and/or temperature. See '-h' for usage.\n" )
+            return
+
+        # Format status to send to light
+        status = {"numberOfLights":1,"lights":[status]}
+        response = requests.put( f"http://{self.location}/elgato/lights", json=status )
+
+        return response.ok
+
 def light_to_json( obj:Light ) -> dict:
     """Takes a Light object and turns it to a simple dict for easy JSON encoding
 
@@ -275,37 +323,6 @@ def get_lights( requested_lights:list=[] ) -> list:
 
         return lights
 
-def set_light_status( light, args ):
-
-    status = {}
-
-    if not args.get('on') is None:
-        if not isinstance( args['on'], bool ):
-            args['on'] = on_off_to_bool( args['on'] )
-        status['on'] = 1 if args['on'] else 0
-
-    if not args.get('brightness') is None:
-        if isinstance( args['brightness'], str ) and args['brightness'][-1] == '%':
-            args['brightness'] = args['brightness'][0:-1]
-        status['brightness'] = args['brightness']
-
-    if not args.get('temperature') is None:
-        if isinstance( args['temperature'], str ) and args['temperature'][-1].lower() == 'k':
-            args['temperature'] = args['temperature'][0:-1]
-        if args['temperature'] >= 2900:
-            args['temperature'] = kelvin_to_temperature( args['temperature'] )
-        status['temperature'] = args['temperature']
-
-    if not status:
-        print( "Nothing to set. Please specify on, brightness, and/or temperature. See '-h' for usage.\n" )
-        return
-
-    # Format status to send to light
-    status = {"numberOfLights":1,"lights":[status]}
-    response = requests.put( f"http://{get_light_location( light )}/elgato/lights", json=status )
-
-    return response.ok
-
 def get_light_info( light: str, info: str='' ) -> str:
     response = requests.get( f"http://{get_light_location( light )}/elgato/accessory-info" )
     light_info = response.json()
@@ -370,19 +387,19 @@ def command_toggle( args ):
     lights = get_lights( args['lights'] )
 
     for light in lights:
-        set_light_status( light, { 'on': 0 if on_off_to_bool( light.get_status( 'on' ) ) else 1 } )
+        light.set_status( on=( not on_off_to_bool( light.get_status( 'on' ) ) ) )
 
 def command_on( args ):
     lights = get_lights( args['lights'] )
 
     for light in lights:
-        set_light_status( light, { 'on': True } )
+        light.set_status( on=True )
 
 def command_off( args ):
     lights = get_lights( args['lights'] )
 
     for light in lights:
-        set_light_status( light, { 'on': False } )
+        light.set_status( on=False )
 
 def command_status( args ):
     lights = get_lights( args['lights'] )
@@ -401,31 +418,31 @@ def command_brighter( args ):
     lights = get_lights( args['lights'] )
 
     for light in lights:
-        set_light_status( light, { 'brightness': light.get_status( 'brightness' )+5 } )
+        light.set_status( brightness=( light.get_status( 'brightness' ) + 5 ) )
 
 def command_dimmer( args ):
     lights = get_lights( args['lights'] )
 
     for light in lights:
-        set_light_status( light, { 'brightness': light.get_status( 'brightness' )-5 } )
+        light.set_status( brightness=( light.get_status( 'brightness' ) - 5 ) )
 
 def command_warmer( args ):
     lights = get_lights( args['lights'] )
 
     for light in lights:
-        set_light_status( light, { 'temperature': light.get_status( 'temperature' )+5 } )
+        light.set_status( temperature=( light.get_status( 'temperature' ) + 5 ) )
 
 def command_cooler( args ):
     lights = get_lights( args['lights'] )
 
     for light in lights:
-        set_light_status( light, { 'temperature': light.get_status( 'temperature' )-5 } )
+        light.set_status( temperature=( light.get_status( 'temperature' ) - 5 ) )
 
 def command_set( args ):
     lights = get_lights( args['lights'] )
 
     for light in lights:
-        set_light_status( light, args)
+        light.set_status( **args)
 
 def command_list( args ):
     lights = get_lights( args['lights'] )
