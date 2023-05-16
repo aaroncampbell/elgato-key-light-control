@@ -374,9 +374,33 @@ def get_lights( requested_lights:list=[] ) -> list:
         return lights
 
 def temperature_to_kelvin( temperature:int ) -> int:
+    """Convert temperature as stored in Elgato lights to kelvin
+
+    I don't know what measurement Elgato lights use to store termperature, but
+    it can be converted to Kelvin using (1,000,000 / ElgatoTemp) and rounding
+    to the nearest 50.
+
+    Args:
+        temperature (int): Temperature used in Elgato light
+
+    Returns:
+        int: Kelvin
+    """
     return 50 * round( 1000000 / temperature / 50 )
 
 def kelvin_to_temperature( kelvin:int ) -> int:
+    """Convert kelvin to temperature as stored in Elgato lights
+
+    I don't know what measurement Elgato lights use to store termperature, but
+    Kelvin can be converted to it using (1,000,000 / kelvin) and rounding to the
+    nearest whole number.
+
+    Args:
+        kelvin (int): Temperature in kelvin
+
+    Returns:
+        int: temperature to be used in Elgato light
+    """
     return round( 1000000 / kelvin )
 
 def on_off_to_bool( string:str ) -> bool:
@@ -396,6 +420,14 @@ def on_off_to_bool( string:str ) -> bool:
     return string.lower() == 'on' or string == '1'
 
 def brightness_from_str( brightness:str ) -> int|bool:
+    """Convert a string to an int representing brightness
+
+    Args:
+        brightness (str): String representing brightness
+
+    Returns:
+        int|bool: int representing brightness on success and False on failure
+    """
     # If brightness is a string ending in '%', trim the '%'
     if isinstance( brightness, str ) and brightness[-1] == '%':
         brightness = brightness[0:-1]
@@ -407,6 +439,14 @@ def brightness_from_str( brightness:str ) -> int|bool:
 
 
 def is_valid_brightness( brightness:int ) -> bool:
+    """Check if a brightness is valid
+
+    Args:
+        brightness (int): brightness as an int or a string representing brightness
+
+    Returns:
+        bool: True if the brightness is valid (3-100). False otherwise
+    """
     # If not already an int, enforce that
     if not isinstance( brightness, int ):
         brightness = brightness_from_str( brightness=brightness )
@@ -415,6 +455,17 @@ def is_valid_brightness( brightness:int ) -> bool:
     return not ( brightness > 100 or brightness < 3 )
 
 def brightness_value( brightness_string:str ) -> int:
+    """Get brightness as an int - for use as parse arg type
+
+    Args:
+        brightness_string (str): Brightness specified in arg
+
+    Raises:
+        argparse.ArgumentTypeError: If the brightness isn't valid we raise an argparse error to the parser
+
+    Returns:
+        int: brightness
+    """
     if isinstance( brightness, int ):
         brightness = brightness_string # already an int, just use it
     else:
