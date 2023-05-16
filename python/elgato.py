@@ -19,6 +19,28 @@ class Light():
         self.name = name
         self.location = location
 
+    def get_status( self, status: str='' ) -> dict|int:
+        """Get status from light using endpoint
+        Status includes:
+          on/off
+          brightness
+          temperature
+
+        Args:
+            status (str, optional): specific item to get from status [on, brigtness, temperature]. Defaults to All.
+
+        Returns:
+            dict|int: Dict of status results or int representing value of specified status
+        """
+        response = requests.get( f"http://{self.location}/elgato/lights" )
+        # TODO: Should this be stored in object? It can get stale by being changed from elsewhere
+        self.status = response.json()["lights"][0]
+
+        if status: # If a specific status item was requested
+            return self.status.get( status )
+
+        return self.status
+
 def light_to_json( obj:Light ) -> dict:
     """Takes a Light object and turns it to a simple dict for easy JSON encoding
 
@@ -253,16 +275,6 @@ def get_lights( requested_lights:list=[] ) -> list:
 
         return lights
 
-def get_light_status( light: str, status: str='' ) -> str:
-    response = requests.get( f"http://{get_light_location( light )}/elgato/lights" )
-    light_status = response.json()
-    light_status = light_status["lights"][0]
-
-    if status:
-        light_status = light_status.get( status )
-
-    return light_status
-
 def set_light_status( light, args ):
 
     status = {}
@@ -358,7 +370,7 @@ def command_toggle( args ):
     lights = get_lights( args['lights'] )
 
     for light in lights:
-        set_light_status( light, { 'on': 0 if on_off_to_bool( get_light_status( light, 'on' ) ) else 1 } )
+        set_light_status( light, { 'on': 0 if on_off_to_bool( light.get_status( 'on' ) ) else 1 } )
 
 def command_on( args ):
     lights = get_lights( args['lights'] )
@@ -376,7 +388,7 @@ def command_status( args ):
     lights = get_lights( args['lights'] )
     for light in lights:
         print( f"Status for {light.name}:" )
-        print( json.dumps( friendly_status( get_light_status( light ) ), default=light_to_json, indent=4 ) )
+        print( json.dumps( friendly_status( light.get_status() ), default=light_to_json, indent=4 ) )
 
 def command_info( args ):
     lights = get_lights( args['lights'] )
@@ -389,25 +401,25 @@ def command_brighter( args ):
     lights = get_lights( args['lights'] )
 
     for light in lights:
-        set_light_status( light, { 'brightness': get_light_status( light, 'brightness' )+5 } )
+        set_light_status( light, { 'brightness': light.get_status( 'brightness' )+5 } )
 
 def command_dimmer( args ):
     lights = get_lights( args['lights'] )
 
     for light in lights:
-        set_light_status( light, { 'brightness': get_light_status( light, 'brightness' )-5 } )
+        set_light_status( light, { 'brightness': light.get_status( 'brightness' )-5 } )
 
 def command_warmer( args ):
     lights = get_lights( args['lights'] )
 
     for light in lights:
-        set_light_status( light, { 'temperature': get_light_status( light, 'temperature' )+5 } )
+        set_light_status( light, { 'temperature': light.get_status( 'temperature' )+5 } )
 
 def command_cooler( args ):
     lights = get_lights( args['lights'] )
 
     for light in lights:
-        set_light_status( light, { 'temperature': get_light_status( light, 'temperature' )-5 } )
+        set_light_status( light, { 'temperature': light.get_status( 'temperature' )-5 } )
 
 def command_set( args ):
     lights = get_lights( args['lights'] )
