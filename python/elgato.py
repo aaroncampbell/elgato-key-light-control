@@ -617,14 +617,6 @@ def command_list( args ):
     for index, light in enumerate( lights ):
         print( f"[{index+1}] {light.name} ({light.location})" )
 
-def command_test( args ):
-    lights = get_lights( args['lights'] )
-    test = [ -1, 0, 1, 3, 100, 123, '3', '100', 'abc' ]
-
-    for brightness in test:
-        valid = is_valid_brightness( brightness )
-        print( f"Testing '{brightness}', result: {valid}" )
-
 parser = argparse.ArgumentParser( description='Control Elgato Lights.' )
 subparsers = parser.add_subparsers( title='commands', metavar='Use -h or --help with any command for command-specific help' )
 
@@ -674,10 +666,6 @@ parser_set.add_argument( '-b', '--brightness', type=brightness_value, help='Brig
 parser_set.add_argument( '-t', '--temperature', type=temperature_value, help='Temperature for light - Kelvin from 2900k - 7000k (increments of 50)', metavar="2900-7000k (increments of 50)")
 
 parser.add_argument( '--version', action='version', version='%(prog)s 0.0.1' )
-
-parser_test = subparsers.add_parser('test', help='For Testing', parents=[parent_parser] )
-parser_test.set_defaults( func=command_test )
-
 
 args = parser.parse_args()
 
