@@ -550,127 +550,230 @@ def temperature_value( temperature_string:str ) -> int:
         raise argparse.ArgumentTypeError( "invalid temperature value: %r (valid is 2900-7000k in increments of 50)" % temperature_string )
     return temperature
 
-def command_toggle( args ):
+def command_toggle( args:dict ):
+    """Process toggle command
+
+    Args:
+        args (dict): Parsed args from command line
+    """
+    # Get lights (either all, or those specified)
     lights = get_lights( args['lights'] )
 
-    for light in lights:
+    for light in lights: # for each light
+        # Get on status and set to opposite
         light.set_status( on=( not on_off_to_bool( light.get_status( 'on' ) ) ) )
 
-def command_on( args ):
+def command_on( args:dict ):
+    """Process on command
+
+    Args:
+        args (dict): Parsed args from command line
+    """
+    # Get lights (either all, or those specified)
     lights = get_lights( args['lights'] )
 
-    for light in lights:
-        light.set_status( on=True )
+    for light in lights: # for each light
+        light.set_status( on=True ) # set to on
 
-def command_off( args ):
+def command_off( args:dict ):
+    """Process off command
+
+    Args:
+        args (dict): Parsed args from command line
+    """
+    # Get lights (either all, or those specified)
     lights = get_lights( args['lights'] )
 
-    for light in lights:
-        light.set_status( on=False )
+    for light in lights: # for each light
+        light.set_status( on=False ) # Set to off
 
-def command_status( args ):
+def command_status( args:dict ):
+    """Process status command
+
+    Args:
+        args (dict): Parsed args from command line
+    """
+    # Get lights (either all, or those specified)
     lights = get_lights( args['lights'] )
-    for light in lights:
-        print( f"Status for {light.name}:" )
+
+    for light in lights: # for each light
+        print( f"Status for {light.name}:" ) # heading with light name
+        # pretty print json status
         print( json.dumps( light.friendly_status(), default=light_to_json, indent=4 ) )
 
-def command_info( args ):
+def command_info( args:dict ):
+    """Process info command
+
+    Args:
+        args (dict): Parsed args from command line
+    """
+    # Get lights (either all, or those specified)
     lights = get_lights( args['lights'] )
 
-    for light in lights:
-        print( f"Info for {light.name}:" )
+    for light in lights: # for each light
+        print( f"Info for {light.name}:" ) # heading with light name
+        # pretty print json info
         print( json.dumps( light.get_info(), default=light_to_json, indent=4 ) )
 
-def command_brighter( args ):
+def command_brighter( args:dict ):
+    """Process brighter command
+
+    Args:
+        args (dict): Parsed args from command line
+    """
+    # Get lights (either all, or those specified)
     lights = get_lights( args['lights'] )
 
-    for light in lights:
+    for light in lights: # for each light
+        # Get brightness and set +5
         light.set_status( brightness=( light.get_status( 'brightness' ) + 5 ) )
 
-def command_dimmer( args ):
+def command_dimmer( args:dict ):
+    """Process dimmer command
+
+    Args:
+        args (dict): Parsed args from command line
+    """
+    # Get lights (either all, or those specified)
     lights = get_lights( args['lights'] )
 
-    for light in lights:
+    for light in lights: # for each light
+        # Get brightness and set -5
         light.set_status( brightness=( light.get_status( 'brightness' ) - 5 ) )
 
-def command_warmer( args ):
+def command_warmer( args:dict ):
+    """Process warmer command
+
+    Args:
+        args (dict): Parsed args from command line
+    """
+    # Get lights (either all, or those specified)
     lights = get_lights( args['lights'] )
 
-    for light in lights:
+    for light in lights: # for each light
+        # Get temperature and set +5
         light.set_status( temperature=( light.get_status( 'temperature' ) + 5 ) )
 
-def command_cooler( args ):
+def command_cooler( args:dict ):
+    """Process cooler command
+
+    Args:
+        args (dict): Parsed args from command line
+    """
+    # Get lights (either all, or those specified)
     lights = get_lights( args['lights'] )
 
-    for light in lights:
+    for light in lights: # for each light
+        # Get temperature and set -5
         light.set_status( temperature=( light.get_status( 'temperature' ) - 5 ) )
 
-def command_set( args ):
+def command_set( args:dict ):
+    """Process set command
+
+    Args:
+        args (dict): Parsed args from command line
+    """
+    # Get lights (either all, or those specified)
     lights = get_lights( args['lights'] )
 
-    for light in lights:
-        light.set_status( **args)
+    for light in lights: # for each light
+        light.set_status( **args) # Pass args through, extras are ignored
 
-def command_list( args ):
+def command_list( args:dict ):
+    """Process list command
+
+    Args:
+        args (dict): Parsed args from command line
+    """
+    # Get lights (either all, or those specified)
     lights = get_lights( args['lights'] )
 
-    for index, light in enumerate( lights ):
+    for index, light in enumerate( lights ): # Enumerate so we have index
+        # Display light name & location, with number as index+1
         print( f"[{index+1}] {light.name} ({light.location})" )
 
+# Create base args parser
 parser = argparse.ArgumentParser( description='Control Elgato Lights.' )
+# Create sub parser for commands
 subparsers = parser.add_subparsers( title='commands', metavar='Use -h or --help with any command for command-specific help' )
 
+# Create a parent parser to allow for arguments that exist in multiple commands
 parent_parser = argparse.ArgumentParser(add_help=False)
+# Add `--light` arg
 parent_parser.add_argument( '--light', dest='lights', action='append', metavar='LIGHT', help='Light to target as number (from %(prog)s list) or IP:PORT. Can include multiple times.' )
 
+# Add parser for `find` command
 parser_find = subparsers.add_parser('find', aliases=['search'], help='Find lights' )
-parser_find.set_defaults( func=find_lights )
+parser_find.set_defaults( func=find_lights ) # Set function to call
 
+# Add parser for `list` command
 parser_list = subparsers.add_parser('list', help='List lights', parents=[parent_parser] )
-parser_list.set_defaults( func=command_list )
+parser_list.set_defaults( func=command_list ) # Set function to call
 
+# Add parser for `toggle` command
 parser_toggle = subparsers.add_parser('toggle', help='Toggle lights on or off', parents=[parent_parser] )
-parser_toggle.set_defaults( func=command_toggle )
+parser_toggle.set_defaults( func=command_toggle ) # Set function to call
 
+# Add parser for `on` command
 parser_on = subparsers.add_parser('on', help='Turn lights on', parents=[parent_parser] )
-parser_on.set_defaults( func=command_on )
+parser_on.set_defaults( func=command_on ) # Set function to call
 
+# Add parser for `off` command
 parser_off = subparsers.add_parser('off', help='Turn lights off', parents=[parent_parser] )
-parser_off.set_defaults( func=command_off )
+parser_off.set_defaults( func=command_off ) # Set function to call
 
+# Add parser for `status` command
 parser_status = subparsers.add_parser('status', help='Check the status of lights', parents=[parent_parser] )
-parser_status.set_defaults( func=command_status )
+parser_status.set_defaults( func=command_status ) # Set function to call
 
+# Add parser for `info` command
 parser_info = subparsers.add_parser('info', help='Get info on lights', parents=[parent_parser] )
-parser_info.set_defaults( func=command_info )
+parser_info.set_defaults( func=command_info ) # Set function to call
 
+# Add parser for `brighter` command
 parser_brighter = subparsers.add_parser('brighter', help='Make lights brighter', parents=[parent_parser] )
-parser_brighter.set_defaults( func=command_brighter )
+parser_brighter.set_defaults( func=command_brighter ) # Set function to call
 
+# Add parser for `dimmer` command
 parser_dimmer = subparsers.add_parser('dimmer', help='Make lights dimmer', parents=[parent_parser] )
-parser_dimmer.set_defaults( func=command_dimmer )
+parser_dimmer.set_defaults( func=command_dimmer ) # Set function to call
 
+# Add parser for `warmer` command
 parser_warmer = subparsers.add_parser('warmer', help='Adjust temperature of lights warmer', parents=[parent_parser] )
-parser_warmer.set_defaults( func=command_warmer )
+parser_warmer.set_defaults( func=command_warmer ) # Set function to call
 
+# Add parser for `cooler` command
 parser_cooler = subparsers.add_parser('cooler', help='Adjust temperature of lights cooler', parents=[parent_parser] )
-parser_cooler.set_defaults( func=command_cooler )
+parser_cooler.set_defaults( func=command_cooler ) # Set function to call
 
+# Add parser for `set` command
 parser_set = subparsers.add_parser('set', help='Set status for lights, including on/off, brightness, and temperature', parents=[parent_parser])
-parser_set.set_defaults( func=command_set )
+parser_set.set_defaults( func=command_set ) # Set function to call
+
+# Create a mutually exclusive group as part of the `set` command parser, for
+# `-o`, `--on`, & `--off` which specify the same setting and should never be
+# used together
 on_off_group = parser_set.add_mutually_exclusive_group()
+# Add `-o` arg to `set` command to specify on or off
 on_off_group.add_argument( '-o', dest='on', type=on_off_to_bool, help='Whether to set the light(s) on or off', metavar='ON|OFF')
+# Add `--on` which is the same as `-o on`
 on_off_group.add_argument('--on', action='store_true', dest='on')
+# Add `--off` which is the same as `-o off`
 on_off_group.add_argument('--off', action='store_false', dest='on')
+# Add `-b` arg to `set` command to specify brightness
 parser_set.add_argument( '-b', '--brightness', type=brightness_value, help='Brightness for light - percentage from 3 to 100', metavar="3-100")
+# Add `-t` arg to `set` command to specify temperature
 parser_set.add_argument( '-t', '--temperature', type=temperature_value, help='Temperature for light - Kelvin from 2900k - 7000k (increments of 50)', metavar="2900-7000k (increments of 50)")
 
+# Add `--version` arg to main parser
 parser.add_argument( '--version', action='version', version='%(prog)s 0.0.1' )
 
+# Get args from parser
 args = parser.parse_args()
 
+# If a function was specified as part of the args and is callable
 if hasattr( args, 'func' ) and callable( args.func ):
-    args.func( vars( args ) )
+    args.func( vars( args ) ) # call function with the parsed args
     sys.exit()
 
 # If no function was found to process, show help
