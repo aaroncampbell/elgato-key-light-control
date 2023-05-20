@@ -766,7 +766,7 @@ parser_set.add_argument( '-b', '--brightness', type=brightness_value, help='Brig
 parser_set.add_argument( '-t', '--temperature', type=temperature_value, help='Temperature for light - Kelvin from 2900k - 7000k (increments of 50)', metavar="2900-7000k (increments of 50)")
 
 # Add `--version` arg to main parser
-parser.add_argument( '--version', action='version', version='%(prog)s 0.0.1' )
+parser.add_argument( '--version', action='version', version='%(prog)s 0.1.0' )
 
 # Get args from parser
 args = parser.parse_args()
