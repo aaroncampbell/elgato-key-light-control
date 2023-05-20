@@ -476,12 +476,77 @@ def brightness_value( brightness_string:str ) -> int:
         raise argparse.ArgumentTypeError( "invalid brightness value: %r (valid is whole number 3-100)" % brightness_string )
     return brightness
 
+
+def temperature_from_str( temperature:str ) -> int|bool:
+    """Convert a string to an int representing temperature
+
+    Args:
+        temperature (str): String representing temperature
+
+    Returns:
+        int|bool: int representing temperature on success and False on failure
+    """
+    # If temperature is a string ending in 'k', trim the 'k'
+    if isinstance( temperature, str ) and temperature[-1] == 'k':
+        temperature = temperature[0:-1]
+
+    try:
+        return int( temperature ) # Return temperature as an int
+    except ValueError:
+        return False # not an int, can't be a temperature
+
+
+def is_valid_temperature_kelvin( temperature:int ) -> bool:
+    """Check if a kelvin temperature is valid
+
+    Args:
+        temperature (int): temperature as an int or a string representing temperature
+
+    Returns:
+        bool: True if the temperature is valid (2900-7000). False otherwise
+    """
+    # If not already an int, enforce that
+    if not isinstance( temperature, int ):
+        temperature = temperature_from_str( temperature=temperature )
+
+    # True if 2900-7000, False otherwise
+    return not ( temperature > 7000 or temperature < 2900 or temperature % 50 )
+
+def is_valid_temperature( temperature:int ) -> bool:
+    """Check if a temperature is valid
+
+    Args:
+        temperature (int): temperature as an int or a string representing temperature
+
+    Returns:
+        bool: True if the temperature is valid (143-344). False otherwise
+    """
+    # If not already an int, enforce that
+    if not isinstance( temperature, int ):
+        temperature = temperature_from_str( temperature=temperature )
+
+    # True if 143-344, False otherwise
+    return not ( temperature > 344 or temperature < 143 )
+
 def temperature_value( temperature_string:str ) -> int:
-    # If the temperature ends in a k, strip it
-    if temperature_string[-1].lower() == 'k':
-        temperature_string = temperature_string[0:-1]
-    temperature = int( temperature_string )
-    if temperature > 7000 or temperature < 2900 or temperature % 50:
+    """Get temperature as an int - for use as parse arg type
+
+    Args:
+        temperature_string (str): Temperature specified in arg
+
+    Raises:
+        argparse.ArgumentTypeError: If the temperature isn't valid we raise an argparse error to the parser
+
+    Returns:
+        int: temperature
+    """
+    if isinstance( temperature_string, int ):
+        temperature = temperature_string # already an int, just use it
+    else:
+        # Normalize strings like '3400' or '3400k' to int
+        temperature = temperature_from_str( temperature=temperature_string )
+
+    if not is_valid_temperature_kelvin( temperature ):
         raise argparse.ArgumentTypeError( "invalid temperature value: %r (valid is 2900-7000k in increments of 50)" % temperature_string )
     return temperature
 
