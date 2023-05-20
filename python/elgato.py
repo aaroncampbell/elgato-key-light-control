@@ -466,7 +466,7 @@ def brightness_value( brightness_string:str ) -> int:
     Returns:
         int: brightness
     """
-    if isinstance( brightness, int ):
+    if isinstance( brightness_string, int ):
         brightness = brightness_string # already an int, just use it
     else:
         # Normalize strings like '50' or '50%' to int
