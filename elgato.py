@@ -7,10 +7,14 @@ import requests
 import time
 import argparse
 import ipaddress
+from appdirs import user_config_dir
 from zeroconf import ServiceBrowser, Zeroconf # for discovery
 # from pprint import pprint # for debugging
 
-config_file = os.path.expanduser('~/.config/elgato.control.json')
+appname = "ElgatoControl"
+appauthor = "AaronDCampbell"
+
+config_file = os.path.join( user_config_dir(appname, appauthor), 'elgato.control.json' )
 default_port = 9123 # Port to use when IP is specified without port
 lights = [] # Global that holds list of light obects
 
